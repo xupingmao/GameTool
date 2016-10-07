@@ -1,0 +1,10 @@
+*.obj
+*.tlog
+*.log
+*.exe
+*.db
+*.opendb
+*/Debug/
+*/*/Debug/
+*/.vs/
+*/ipch/
