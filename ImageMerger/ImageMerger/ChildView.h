@@ -42,11 +42,18 @@ public:
 private:
 	vector<Gdiplus::Image*> imageVector;
 
+	CButton m_addBtn;
+	CButton m_saveBtn;
+	CButton m_removeBtn;
+
 	int width = 0;
 	int height = 0;
+	int m_startY;
 
 public:
 	afx_msg void OnSaveImage();
 	int CChildView::GetEncoderClsid(const WCHAR* format, CLSID* pClsid);
+	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
+	afx_msg void OnRemoveImage();
 };
 
