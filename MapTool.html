@@ -1,0 +1,231 @@
+<body>
+<head>
+    <meta charset="utf-8"/>
+</head>
+<div>
+    <!-- Control -->
+    <input type="file" id="file" value="Select Background Image" onchange="OnLoadFile()" accept="image/gif,image/jpg,image/png,image/bmp"/>
+    <input type="button" id="map_array" value="Map Array" onclick="OnExportArray()"/>
+    <br/>
+    <br/>
+    地图Delta值<input type="text" id="delta" value="40"/>
+</div>
+
+<div style="width:100%;height:30px;">
+</div>
+
+<div style="width:100%;">
+<canvas id="canvas" width="800" height="600" style="border:1px solid #d3d3d3;cursor:crosshair;float:left;">
+    Your browser do not support Canvas.
+</canvas>
+<div>
+    <textarea id="output" rows=30 cols=100></textarea>
+</div>
+
+</div>
+
+<script>
+var WIDTH = 800;
+var HEIGHT = 600;
+
+var canvas = document.getElementById("canvas");
+
+var context = canvas.getContext("2d");
+// context.fillStyle="#0f0";
+// context.drawRect(0,0,100,100);
+    
+var stage = {
+    canvas: canvas,
+    ctx:    context,
+    width:  WIDTH,
+    height: HEIGHT,
+    dx:     40,
+    dy:     40,
+    background: null,
+    selectedRectMap: {},
+    
+    switchPosition: function (x, y) {
+        var oldX = x;
+        var oldY = y;
+        var dx = this.dx;
+        var dy = this.dy;
+        var x = parseInt( x / dx ) * dx;
+        var y = parseInt( y / dy ) * dy;
+        var key = x + "-" + y;
+        if (this.selectedRectMap[key]) {
+            this.selectedRectMap[key] = null;
+        } else {
+            this.selectedRectMap[key] = [x, y, oldX, oldY];
+        }
+    },
+    
+    updateMap: function() {
+        var dx = this.dx;
+        var dy = this.dy;
+        
+        var oldRectMap = this.selectedRectMap;
+        this.selectedRectMap = {};
+        
+        for (var key in oldRectMap) {
+            var rect = oldRectMap[key];
+            if (rect == null) continue;
+            var oldX = rect[2];
+            var oldY = rect[3];
+            this.switchPosition(oldX, oldY);
+        }
+    },
+    
+    positionIsTaken: function (x, y) {
+        var key = x + "-" + y;
+        return this.selectedRectMap[key];
+    },
+    
+    updateDelta: function() {
+        var delta = document.getElementById("delta").value;
+        var deltaV = parseInt(delta);
+        if (typeof deltaV == "number" && deltaV != 0) {
+            this.oldDelta = this.delta;
+            this.delta = deltaV;
+            this.dx = deltaV;
+            this.dy = deltaV;
+            
+            if (this.oldDelta != this.delta) {
+                this.updateMap();
+            }
+        }
+    },
+    
+    click: function (event) {
+        console.log(event);
+        var dx = stage.dx;
+        var dy = stage.dy;
+        
+        var x = event.offsetX;
+        var y = event.offsetY;
+        // var x = parseInt( x / dx ) * dx;
+        // var y = parseInt( y / dy ) * dy;
+        stage.switchPosition(x, y);
+    },
+    
+    update: function () {
+        
+        this.updateDelta();
+    
+        var ctx = this.ctx;
+        var dx = this.dx;
+        var dy = this.dy;
+        
+        if (this.background) {
+            ctx.drawImage(this.background, 0, 0, this.width, this.height);
+        } else {
+            ctx.clearRect(0, 0, this.width, this.height);
+        }
+        
+        ctx.lineWidth = 1;
+        for (var x = 0; x <= this.width; x += dx) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, this.height);
+            ctx.stroke();
+        }
+        for (var y = 0; y <= this.height; y += dy) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(this.width, y);
+            ctx.stroke();
+        }
+        
+        // draw selected rectangle
+        ctx.fillStyle="rgba(0,255,0,0.5)";
+        for (var key in this.selectedRectMap) {
+            var rect = this.selectedRectMap[key];
+            if (rect == null) continue;
+            ctx.fillRect(rect[0], rect[1], dx, dy);
+        }
+    },
+    
+    run: function() {
+        var fps = this.fps ? this.fps : 20;
+        var interval = 1000 / fps;
+        var _update = this.update;
+        var self = this;
+        _run = function () {
+            _update.apply(self);
+            self.intervalId = setTimeout(_run, interval);
+            // console.log("run");
+        }
+        _run();
+    }
+}
+
+stage.exportMapArray = function () {
+
+    var array = [];
+    var dx = this.dx;
+    var dy = this.dy;
+    var cArray = "int[X][Y] map = {\n";
+    
+    for (var x = 0; x < this.width; x += dx) {
+        var array2 = [];
+        var subArray = "{";
+        for (var y = 0; y < this.height; y += dy ) {
+            var value;
+            if (this.positionIsTaken(x, y)) {
+                array2.push(1);
+                value = 1;
+            } else {
+                array2.push(0);
+                value = 0;
+            }
+            if (y == 0) {
+                subArray += value;
+            } else {
+                subArray += "," + value;
+            }
+        }
+        subArray += "}";
+        array.push(array2);
+        
+        if (x == 0) {
+            cArray += subArray;
+        } else {
+            cArray += ",\n" + subArray;
+        }
+    }
+    
+    cArray += "\n};";
+    console.log(array);
+    
+    document.getElementById("output").value = cArray;
+}
+    
+stage.run();
+
+canvas.addEventListener("click", stage.click);
+
+function OnLoadFile() {
+    var fileElmt = document.getElementById("file");
+    if (fileElmt.files.length) {
+        var file = fileElmt.files[0];
+        var reader = new FileReader();  
+        var image = new Image();
+        reader.onload = function() {  
+            image.src = this.result;
+            stage.background = image;
+        };  
+        reader.readAsDataURL(file);
+    }
+}
+
+function OnExportArray() {
+    stage.exportMapArray();
+}
+
+function OnDeltaChange() {
+    // update automaticly
+    stage.updateDelta();
+}
+
+</script>
+
+</body>
